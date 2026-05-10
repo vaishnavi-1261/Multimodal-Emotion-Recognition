@@ -1,8 +1,5 @@
 import streamlit as st
-import numpy as np
 import joblib
-import tempfile
-from sklearn.preprocessing import LabelEncoder
 from streamlit_mic_recorder import mic_recorder
 
 # ------------------------------------------------
@@ -10,7 +7,7 @@ from streamlit_mic_recorder import mic_recorder
 # ------------------------------------------------
 
 st.set_page_config(
-    page_title="Multimodal Emotion Recognition",
+    page_title="Emotion Recognition AI",
     page_icon="🎭",
     layout="centered"
 )
@@ -28,49 +25,48 @@ st.markdown("""
 
 .title {
     text-align: center;
-    font-size: 50px;
+    font-size: 52px;
     font-weight: bold;
     color: white;
+    margin-top: 20px;
 }
 
 .subtitle {
     text-align: center;
     color: #BBBBBB;
     font-size: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 
 .result-box {
-    padding: 20px;
+    padding: 25px;
     border-radius: 15px;
-    margin-top: 20px;
+    margin-top: 25px;
     background-color: #1E1E1E;
-    border: 1px solid #444;
+    border: 1px solid #333333;
+    text-align: center;
 }
 
 .footer {
     text-align: center;
     color: gray;
-    margin-top: 50px;
+    margin-top: 60px;
+}
+
+.stButton > button {
+    width: 100%;
+    border-radius: 12px;
+    height: 50px;
+    font-size: 20px;
+    font-weight: bold;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------
-# LOAD MODELS
+# LOAD NLP MODEL
 # ------------------------------------------------
-
-speech_model = load_model(
-    "models/speech_pipeline/speech_emotion_model.h5"
-)
-
-speech_labels = np.load(
-    "models/speech_pipeline/y_labels.npy"
-)
-
-speech_encoder = LabelEncoder()
-speech_encoder.fit(speech_labels)
 
 text_model = joblib.load(
     "models/text_pipeline/text_emotion_model.pkl"
@@ -81,178 +77,124 @@ vectorizer = joblib.load(
 )
 
 # ------------------------------------------------
-# FEATURE EXTRACTION
-# ------------------------------------------------
-
-def extract_features(file_path):
-
-    audio, sample_rate = librosa.load(
-        file_path,
-        sr=22050
-    )
-
-    mfccs = librosa.feature.mfcc(
-        y=audio,
-        sr=sample_rate,
-        n_mfcc=40
-    )
-
-    mfccs_processed = np.mean(
-        mfccs.T,
-        axis=0
-    )
-
-    return mfccs_processed
-
-# ------------------------------------------------
 # HEADER
 # ------------------------------------------------
 
 st.markdown(
-    '<div class="title">🎭 Multimodal Emotion Recognition</div>',
+    '<div class="title">🎭 Emotion Recognition AI</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="subtitle">Real-Time Speech + Text Emotion Detection using AI</div>',
+    '<div class="subtitle">Real-Time Mood Detection using NLP & AI</div>',
     unsafe_allow_html=True
 )
 
 # ------------------------------------------------
-# AUDIO INPUT OPTIONS
+# AUDIO UI (FOR INTERACTION PURPOSE)
 # ------------------------------------------------
 
-st.subheader("🎤 Voice Input")
+st.subheader("🎤 Voice Interaction")
 
-st.write("You can either record live audio or upload a WAV file.")
+st.write("Record your voice or upload audio for interaction.")
 
-# Live recording
 recorded_audio = mic_recorder(
     start_prompt="🎙 Start Recording",
     stop_prompt="⏹ Stop Recording",
     just_once=True
 )
 
-# Upload audio option
 uploaded_audio = st.file_uploader(
     "📁 Upload WAV Audio File",
     type=["wav"]
 )
 
-# Final audio selection
-final_audio = None
-
-if recorded_audio:
-    final_audio = recorded_audio["bytes"]
-
-elif uploaded_audio is not None:
-    final_audio = uploaded_audio.read()
-
 # ------------------------------------------------
 # TEXT INPUT
 # ------------------------------------------------
 
-text_input = st.text_input(
-    "✍ Enter Text"
+st.subheader("✍ Enter Your Message")
+
+text_input = st.text_area(
+    "",
+    placeholder="Type how you feel..."
 )
 
 # ------------------------------------------------
-# PREDICT BUTTON
+# EMOTION PREDICTION
 # ------------------------------------------------
 
-if st.button("🚀 Predict Emotion"):
+if st.button("🚀 Detect Emotion"):
 
-    if final_audio and text_input != "":
-
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=".wav"
-        ) as tmp_file:
-
-            tmp_file.write(final_audio)
-
-            temp_audio_path = tmp_file.name
-
-        # ----------------------------------------
-        # SPEECH PREDICTION
-        # ----------------------------------------
-
-        speech_features = extract_features(temp_audio_path)
-
-        speech_features = np.expand_dims(
-            speech_features,
-            axis=0
-        )
-
-        speech_prediction = speech_model.predict(
-            speech_features
-        )
-
-        speech_emotion = speech_encoder.inverse_transform(
-            [np.argmax(speech_prediction)]
-        )[0]
-
-        # ----------------------------------------
-        # TEXT PREDICTION
-        # ----------------------------------------
+    if text_input != "":
 
         text_vectorized = vectorizer.transform(
             [text_input]
         )
 
-        text_emotion = text_model.predict(
+        predicted_emotion = text_model.predict(
             text_vectorized
         )[0]
 
-        # ----------------------------------------
-        # ADVANCED FUSION LOGIC
-        # ----------------------------------------
+        # Emotion emoji mapping
+        emoji_map = {
+            "happy": "😊",
+            "sad": "😢",
+            "anger": "😡",
+            "angry": "😡",
+            "fear": "😨",
+            "surprise": "😲",
+            "love": "❤️",
+            "neutral": "😐"
+        }
 
-        # Speech captures hidden emotions better
-        # especially when user speaks normally but emotionally.
+        emoji = emoji_map.get(
+            predicted_emotion.lower(),
+            "🎭"
+        )
 
-        negative_emotions = ["sad", "sadness", "angry", "anger", "fear"]
+        # Smart emotional explanation
+        emotion_message = {
+            "happy": "You seem cheerful and positive.",
+            "sad": "You may be feeling emotionally low.",
+            "anger": "You seem frustrated or angry.",
+            "angry": "You seem frustrated or angry.",
+            "fear": "You may be feeling anxious or fearful.",
+            "surprise": "You seem surprised or shocked.",
+            "love": "You seem affectionate and warm.",
+            "neutral": "Your emotional state appears calm."
+        }
 
-        if speech_emotion == text_emotion:
-            final_emotion = speech_emotion
-
-        elif speech_emotion.lower() in negative_emotions:
-            # Prioritize speech for hidden emotions
-            final_emotion = speech_emotion
-
-        else:
-            final_emotion = text_emotion
-
-        # ----------------------------------------
-        # RESULTS
-        # ----------------------------------------
+        explanation = emotion_message.get(
+            predicted_emotion.lower(),
+            "Emotion detected successfully."
+        )
 
         st.markdown(f"""
         <div class="result-box">
 
-        <h3 style="color:#00FFAA;">
-        🎤 Speech Emotion: {speech_emotion}
-        </h3>
+        <h1>{emoji}</h1>
 
-        <h3 style="color:#00BFFF;">
-        📝 Text Emotion: {text_emotion}
-        </h3>
+        <h2 style="color:#00FFAA;">
+        Detected Emotion:
+        {predicted_emotion.upper()}
+        </h2>
 
-        <h3 style="color:#FFD700;">
-        🎯 Final Emotion: {final_emotion}
-        </h3>
+        <p style="font-size:18px; color:#DDDDDD;">
+        {explanation}
+        </p>
 
         </div>
         """, unsafe_allow_html=True)
 
     else:
-        st.warning("⚠ Please provide audio input and enter text.")
+        st.warning("⚠ Please enter some text.")
 
 # ------------------------------------------------
 # FOOTER
 # ------------------------------------------------
 
 st.markdown(
-    '<div class="footer">Built with ❤️ using Streamlit, TensorFlow & NLP</div>',
+    '<div class="footer">Built with ❤️ using Streamlit & NLP</div>',
     unsafe_allow_html=True
 )
