@@ -1,10 +1,7 @@
 import streamlit as st
-import librosa
 import numpy as np
 import joblib
 import tempfile
-
-from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
 from streamlit_mic_recorder import mic_recorder
 
