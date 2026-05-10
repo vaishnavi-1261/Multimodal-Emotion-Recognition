@@ -6,6 +6,7 @@ import tempfile
 
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import LabelEncoder
+from streamlit_mic_recorder import mic_recorder
 
 # ------------------------------------------------
 # PAGE CONFIG
@@ -48,12 +49,6 @@ st.markdown("""
     margin-top: 20px;
     background-color: #1E1E1E;
     border: 1px solid #444;
-}
-
-.result-text {
-    font-size: 24px;
-    font-weight: bold;
-    color: #00FFAA;
 }
 
 .footer {
@@ -122,18 +117,39 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="subtitle">Speech + Text Emotion Detection using AI</div>',
+    '<div class="subtitle">Real-Time Speech + Text Emotion Detection using AI</div>',
     unsafe_allow_html=True
 )
 
 # ------------------------------------------------
-# AUDIO INPUT
+# AUDIO INPUT OPTIONS
 # ------------------------------------------------
 
-audio_file = st.file_uploader(
+st.subheader("🎤 Voice Input")
+
+st.write("You can either record live audio or upload a WAV file.")
+
+# Live recording
+recorded_audio = mic_recorder(
+    start_prompt="🎙 Start Recording",
+    stop_prompt="⏹ Stop Recording",
+    just_once=True
+)
+
+# Upload audio option
+uploaded_audio = st.file_uploader(
     "📁 Upload WAV Audio File",
     type=["wav"]
 )
+
+# Final audio selection
+final_audio = None
+
+if recorded_audio:
+    final_audio = recorded_audio["bytes"]
+
+elif uploaded_audio is not None:
+    final_audio = uploaded_audio.read()
 
 # ------------------------------------------------
 # TEXT INPUT
@@ -149,15 +165,21 @@ text_input = st.text_input(
 
 if st.button("🚀 Predict Emotion"):
 
-    if audio_file is not None and text_input != "":
+    if final_audio and text_input != "":
 
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".wav"
+        ) as tmp_file:
 
-            tmp_file.write(audio_file.read())
+            tmp_file.write(final_audio)
 
             temp_audio_path = tmp_file.name
 
-        # Speech Prediction
+        # ----------------------------------------
+        # SPEECH PREDICTION
+        # ----------------------------------------
+
         speech_features = extract_features(temp_audio_path)
 
         speech_features = np.expand_dims(
@@ -173,7 +195,10 @@ if st.button("🚀 Predict Emotion"):
             [np.argmax(speech_prediction)]
         )[0]
 
-        # Text Prediction
+        # ----------------------------------------
+        # TEXT PREDICTION
+        # ----------------------------------------
+
         text_vectorized = vectorizer.transform(
             [text_input]
         )
@@ -182,30 +207,49 @@ if st.button("🚀 Predict Emotion"):
             text_vectorized
         )[0]
 
-        # Fusion Logic
+        # ----------------------------------------
+        # ADVANCED FUSION LOGIC
+        # ----------------------------------------
+
+        # Speech captures hidden emotions better
+        # especially when user speaks normally but emotionally.
+
+        negative_emotions = ["sad", "sadness", "angry", "anger", "fear"]
+
         if speech_emotion == text_emotion:
             final_emotion = speech_emotion
-        else:
+
+        elif speech_emotion.lower() in negative_emotions:
+            # Prioritize speech for hidden emotions
             final_emotion = speech_emotion
 
-        # ------------------------------------------------
+        else:
+            final_emotion = text_emotion
+
+        # ----------------------------------------
         # RESULTS
-        # ------------------------------------------------
+        # ----------------------------------------
 
         st.markdown(f"""
-<div class="result-box">
+        <div class="result-box">
 
-<h3 style="color:#00FFAA;">🎤 Speech Emotion: {speech_emotion}</h3>
+        <h3 style="color:#00FFAA;">
+        🎤 Speech Emotion: {speech_emotion}
+        </h3>
 
-<h3 style="color:#00BFFF;">📝 Text Emotion: {text_emotion}</h3>
+        <h3 style="color:#00BFFF;">
+        📝 Text Emotion: {text_emotion}
+        </h3>
 
-<h3 style="color:#FFD700;">🎯 Final Emotion: {final_emotion}</h3>
+        <h3 style="color:#FFD700;">
+        🎯 Final Emotion: {final_emotion}
+        </h3>
 
-</div>
-""", unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
     else:
-        st.warning("⚠ Please upload audio and enter text.")
+        st.warning("⚠ Please provide audio input and enter text.")
 
 # ------------------------------------------------
 # FOOTER
